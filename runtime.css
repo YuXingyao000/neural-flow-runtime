@@ -1,0 +1,27 @@
+.neural-flow { color: var(--text-primary, var(--foreground, currentColor)); }
+.neural-flow [hidden] { display: none !important; }
+.neural-flow .nf-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-right: 96px; }
+.neural-flow .nf-controls select { flex: 1 1 220px; }
+.neural-flow .nf-stage { width: 100%; display: block; margin-top: 8px; }
+.neural-flow .nf-caption { margin-top: 6px; min-height: 2.6em; color: var(--text-secondary, var(--muted-foreground, currentColor)); }
+.neural-flow .nf-label { fill: currentColor; font-size: 12px; }
+.neural-flow .nf-mono { font-family: var(--font-mono, ui-monospace, "Geist Mono", monospace); }
+.neural-flow .nf-secondary { fill: var(--text-secondary, var(--muted-foreground, currentColor)); }
+.neural-flow .nf-frame { fill: none; stroke: currentColor; stroke-width: 1; stroke-opacity: .3; transition: stroke-opacity .25s; }
+.neural-flow .nf-frame.nf-busy { stroke-opacity: .85; }
+.neural-flow .nf-track { fill: none; stroke: currentColor; stroke-opacity: .1; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.neural-flow .nf-track.nf-control { stroke-width: 2; stroke-dasharray: 3 3; }
+.neural-flow .nf-head { fill: none; stroke: currentColor; stroke-opacity: .45; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.neural-flow .nf-glyph { transition: color .35s; }
+.neural-flow .nf-glyph-text { fill: currentColor; fill-opacity: .7; font-size: 11px; font-family: var(--font-mono, ui-monospace, "Geist Mono", monospace); }
+.neural-flow .nf-module { fill: currentColor; fill-opacity: .018; stroke: currentColor; stroke-opacity: .22; stroke-width: 1; stroke-dasharray: 5 6; }
+.neural-flow .nf-output { fill: none; stroke: currentColor; stroke-opacity: .9; stroke-width: 1.8; }
+.neural-flow .nf-output-tag { fill: currentColor; fill-opacity: .1; }
+.neural-flow .nf-output-text { font-size: 11px; font-weight: 500; }
+.neural-flow .nf-loss-tag { fill: currentColor; fill-opacity: .9; }
+.neural-flow .nf-loss-text { fill: var(--background, var(--surface-0, Canvas)); }
+.neural-flow .nf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.neural-flow .nf-module-card { fill: none; }
+.neural-flow.nf-still * { transition: none !important; }
+.neural-flow input[type=checkbox] { accent-color: currentColor; }
+.neural-flow .nf-halo { paint-order: stroke; stroke: var(--background, var(--surface-0, Canvas)); stroke-width: 4px; stroke-linejoin: round; }
