@@ -9,7 +9,7 @@
   /* Family shades alternate a dark and a light lightness per page theme:
      consecutive shades differ by at least 0.2, the light page's lightest shade
      keeps about 2:1 against white, the dark page's darkest stays visible. */
-  const LEVELS = {light: {dark: [.38, .47], light: [.76, .68]}, dark: {dark: [.55, .6], light: [.9, .8]}};
+  const LEVELS = {light: {dark: [.38, .47], light: [.76, .68]}, dark: {dark: [.42, .48], light: [.9, .8]}};
 
   /* Any CSS color (#36c, white, rgb(), oklch()) to [r, g, b, alpha] through a 1x1 canvas. */
   let ink = null;
@@ -42,8 +42,10 @@
     return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   const IDENTITY = new Set(['copy', 'reshape', 'view', 'gather', 'select', 'permute']);
+  const SAME_SHAPE = new Set(['copy', 'reshape', 'view']);
   const GAP = 4, WIDTH = 680;
   let CELL = 12;
+  let FLOOR = .34;  // faintest texture cell; higher on dark pages, where faint cells vanish
   /* One breathing period for solid lines and concat bands, so loops are seamless. */
   const FRONT_SPEED = 120, WAVE_SPEED = 30, WAVE = 46, BAND = 46, STEP = 3;
   const DELAY = {block: 84, junction: 14, tensor: 0, point: 0};
@@ -90,13 +92,16 @@
       return f;
     };
     /* Shades keep the hue: a turned hue made purple read as blue and amber as
-       red, i.e. a different family. The first shade goes to whichever level is
-       farther from the base, so it never sits next to its root. */
+       red, i.e. a different family. They alternate dark and light, start with
+       whichever side is farther from the base, and skip levels within 0.12 of
+       the base so no derived tensor looks like its root. */
     const shade = f => {
       const [L0, a0, b0] = hexToLab(f.base), k = f.shades++, lv = LEVELS[theme];
       const firstDark = Math.abs(lv.dark[0] - L0) >= Math.abs(lv.light[0] - L0);
-      const dark = (k % 2 === 0) === firstDark, levels = lv[dark ? 'dark' : 'light'], gain = dark ? 1.15 : .85;
-      return {kind: 'solid', hex: labToHex([levels[Math.floor(k / 2) % levels.length], a0 * gain, b0 * gain]), family: f};
+      const order = [0, 1].flatMap(i => firstDark ? [['dark', lv.dark[i]], ['light', lv.light[i]]] : [['light', lv.light[i]], ['dark', lv.dark[i]]]);
+      const usable = order.filter(([, L]) => Math.abs(L - L0) >= .12), levels = usable.length >= 2 ? usable : order;
+      const [side, L] = levels[k % levels.length], gain = side === 'dark' ? 1.15 : .85;
+      return {kind: 'solid', hex: labToHex([L, a0 * gain, b0 * gain]), family: f};
     };
     const familiesOf = s => s.kind === 'bands' ? s.parts.map(p => p.family) : s.kind === 'solid' ? [s.family] : [];
     const extent = (id, axis) => styles[id].grid[axis === 0 ? 0 : 1];
@@ -160,7 +165,8 @@
       } else {
         style = merge(content.length ? content : inputs);
       }
-      style = {...style, structure: Boolean(t.structure || (passes && style.structure))};
+      const inherited = passes ? inputs[0]?.structure : t.op === 'concat' && inputs.every(s => s.structure);
+      style = {...style, structure: Boolean(t.structure || inherited)};
       const grid = t.grid ?? (t.op === 'concat'
         ? (t.axis === 0
           ? [t.in.reduce((a, k) => a + styles[k].grid[0], 0), styles[t.in[0]].grid[1]]
@@ -181,13 +187,13 @@
     return n;
   }
   function hash(id) { let h = 7; for (const c of id) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; }
-  const texture = (id, r, c) => .34 + ((hash(id) + r * 17 + c * 29) % 11) / 16;
+  const texture = (id, r, c) => FLOOR + ((hash(id) + r * 17 + c * 29) % 11) / 10 * (.96 - FLOOR);
 
   /* Tensor glyph: concat and copies reuse their inputs' cells, so a source's
      texture survives every operation that does not change its values. */
   /* An identity of a concat (copy / view) is drawn as that concat. */
   const visual = (tensors, styles, id) => {
-    while (styles[id].sameAs && tensors[id].op !== 'broadcast' && tensors[styles[id].sameAs]?.op === 'concat') id = styles[id].sameAs;
+    while (styles[id].sameAs && SAME_SHAPE.has(tensors[id].op) && tensors[styles[id].sameAs]?.op === 'concat') id = styles[id].sameAs;
     return id;
   };
   const cellSize = t => t.cell ?? CELL;
@@ -331,8 +337,9 @@
   }
 
   function mount(svg, original) {
-    const tensors = original.tensors, styles = resolveLineage(tensors, pageTheme(svg.parentElement));
+    const theme = pageTheme(svg.parentElement), tensors = original.tensors, styles = resolveLineage(tensors, theme);
     CELL = original.cell ?? 12;
+    FLOOR = theme === 'dark' ? .5 : .34;
     const words = STRINGS[original.lang ?? window.NeuralFlowLang] ?? STRINGS.zh;
     for (const [id, n] of Object.entries(original.nodes))
       if (!['tensor', 'block', 'junction', 'point'].includes(n.kind)) throw new Error(`Node ${id}: kind must be tensor, block, junction or point`);
@@ -533,20 +540,26 @@
       return points;
     });
     const taken = [...layers.labels.querySelectorAll('text')].map(t => t.getBBox());
-    const clear = (box, skip) => box.x >= 2 && box.x + box.width <= width - 2 && !samples.some((points, i) => i !== skip && points.some(p =>
-        p.x > box.x - 2 && p.x < box.x + box.width + 2 && p.y > box.y - 2 && p.y < box.y + box.height + 2))
-      && !taken.some(b => box.x < b.x + b.width && b.x < box.x + box.width && box.y < b.y + b.height && b.y < box.y + box.height);
-    /* The first clear candidate wins; when none is clear the label keeps the
-       first spot with a halo in the page color so it still reads over lines. */
+    const inside = box => box.x >= 2 && box.x + box.width <= width - 2;
+    const apart = box => !taken.some(b => box.x < b.x + b.width && b.x < box.x + box.width && box.y < b.y + b.height && b.y < box.y + box.height);
+    const clear = (box, skip) => inside(box) && apart(box) && !samples.some((points, i) => i !== skip && points.some(p =>
+        p.x > box.x - 2 && p.x < box.x + box.width + 2 && p.y > box.y - 2 && p.y < box.y + box.height + 2));
+    /* The first clear candidate wins. When none is clear the label takes the
+       first spot that only crosses lines, with a halo in the page color so it
+       still reads over them; text never lands on text. */
     const place = (candidates, text, options) => {
+      let fallback = null;
       for (const [x, y, anchor] of candidates) {
         const t = label(x, y, text, {...options, anchor});
         const box = t.getBBox();
         if (clear(box, -1)) { taken.push(box); return t; }
+        if (!fallback && inside(box) && apart(box)) fallback = [x, y, anchor];
         t.remove();
       }
-      const [x, y, anchor] = candidates[0], t = label(x, y, text, {...options, anchor});
+      const [x, y, anchor] = fallback ?? candidates[0], t = label(x, y, text, {...options, anchor});
       t.classList.add('nf-halo');
+      const box = t.getBBox(), shift = Math.max(0, box.x + box.width - (width - 2)) || Math.min(0, box.x - 2);
+      if (shift) t.setAttribute('x', x - shift);
       taken.push(t.getBBox());
       return t;
     };
@@ -557,6 +570,7 @@
       const slots = [];
       for (let dx = 0; dx <= Math.max(0, room); dx += 24) slots.push([m.x + 12 + dx, m.y + 17, 'start']);
       for (let dx = 0; dx <= Math.max(0, room); dx += 24) slots.push([m.x + 12 + dx, m.y + m.h - 8, 'start']);
+      if (room < 0) slots.push([m.x + m.w - 12, m.y + 17, 'end'], [m.x + m.w - 12, m.y + m.h - 8, 'end']);
       place(slots, title, {secondary: true});
     }
     edges.forEach(e => {

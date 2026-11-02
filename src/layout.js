@@ -220,10 +220,12 @@
       const members = m.nodes.filter(id => items[id]).map(id => items[id]);
       const x0 = Math.min(...members.map(i => i.x)) - 12, x1 = Math.max(...members.map(i => i.x + i.w)) + 12;
       const y0 = Math.min(...members.map(i => i.y)) - 26, y1 = Math.max(...members.map(i => i.y + i.b.h)) + 10;
-      const box = m.band ? {x: 8, y: y0, w: width - 16, h: y1 - y0} : {x: x0, y: y0, w: x1 - x0, h: y1 - y0};
+      /* A repeated module draws two cards 8 px up and to the right; keep them inside. */
+      const deck = m.repeat > 1 ? 8 : 0;
+      const box = m.band ? {x: 8, y: y0, w: width - 16 - deck, h: y1 - y0} : {x: x0, y: y0, w: x1 - x0, h: y1 - y0};
       return {...box, label: m.label, repeat: m.repeat};
     });
-    scene.width = width;
+    scene.width = Math.max(width, ...scene.modules.map(m => m.x + m.w + (m.repeat > 1 ? 8 : 0) + 2));
     scene.height = y - GAP + MARGIN;
   }
 
